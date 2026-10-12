@@ -688,11 +688,15 @@ fn parse_excludes_file(data: &[u8]) -> Option<PathBuf> {
 
 /// Expands ~ in file paths to the value of $HOME.
 fn expand_tilde(path: &str) -> String {
-    let home = match home_dir() {
-        None => return path.to_string(),
-        Some(home) => home.to_string_lossy().into_owned(),
-    };
-    path.replace("~", &home)
+    expand_tilde_with_home(path, home_dir().as_deref())
+}
+
+/// Expands ~ in file paths to the home directory given.
+///
+/// When no home directory is given, the path is returned unchanged.
+fn expand_tilde_with_home(path: &str, home: Option<&Path>) -> String {
+    let Some(home) = home else { return path.to_string() };
+    path.replace("~", &home.to_string_lossy())
 }
 
 /// Returns the location of the user's home directory.
