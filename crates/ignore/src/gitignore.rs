@@ -686,17 +686,27 @@ fn parse_excludes_file(data: &[u8]) -> Option<PathBuf> {
     std::str::from_utf8(candidate).ok().map(|s| PathBuf::from(expand_tilde(s)))
 }
 
-/// Expands ~ in file paths to the value of $HOME.
+/// Expands a leading ~ in file paths to the value of $HOME.
 fn expand_tilde(path: &str) -> String {
     expand_tilde_with_home(path, home_dir().as_deref())
 }
 
-/// Expands ~ in file paths to the home directory given.
+/// Expands a leading ~ in file paths to the home directory given.
+///
+/// Like git, this only expands a ~ that is the entire path or is followed by
+/// a `/`. A ~ anywhere else, such as in the Windows short name `RUNNER~1`, is
+/// left as is. The `~user` form, which git expands to that user's home
+/// directory, is left as is too.
 ///
 /// When no home directory is given, the path is returned unchanged.
 fn expand_tilde_with_home(path: &str, home: Option<&Path>) -> String {
     let Some(home) = home else { return path.to_string() };
-    path.replace("~", &home.to_string_lossy())
+    match path.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with('/') => {
+            format!("{}{rest}", home.to_string_lossy())
+        }
+        _ => path.to_string(),
+    }
 }
 
 /// Returns the location of the user's home directory.
@@ -886,6 +896,36 @@ mod tests {
     #[test]
     fn expand_tilde_without_home() {
         assert_eq!(super::expand_tilde_with_home("~/foo", None), "~/foo");
+    }
+
+    #[test]
+    fn expand_tilde_inside_component() {
+        assert_eq!(
+            expand("C:/Users/RUNNER~1/ignore"),
+            "C:/Users/RUNNER~1/ignore"
+        );
+    }
+
+    #[test]
+    fn expand_tilde_trailing_component() {
+        assert_eq!(expand("/foo/bar~/ignore"), "/foo/bar~/ignore");
+    }
+
+    #[test]
+    fn expand_tilde_after_leading_tilde() {
+        assert_eq!(expand("~/foo~bar"), "/home/foobar/foo~bar");
+    }
+
+    #[test]
+    fn expand_tilde_user() {
+        assert_eq!(expand("~quux/foo"), "~quux/foo");
+    }
+
+    #[test]
+    fn parse_excludes_file_tilde_inside_component() {
+        let data = bytes("[core]\nexcludesFile = C:/Users/RUNNER~1/ignore");
+        let got = super::parse_excludes_file(&data).unwrap();
+        assert_eq!(path_string(got), "C:/Users/RUNNER~1/ignore");
     }
 
     // See: https://github.com/BurntSushi/ripgrep/issues/106
