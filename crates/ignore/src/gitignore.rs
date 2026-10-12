@@ -825,6 +825,10 @@ mod tests {
         path.as_ref().to_str().unwrap().to_string()
     }
 
+    fn home_string() -> String {
+        super::home_dir().unwrap().to_string_lossy().into_owned()
+    }
+
     #[test]
     fn parse_excludes_file1() {
         let data = bytes("[core]\nexcludesFile = /foo/bar");
@@ -836,7 +840,7 @@ mod tests {
     fn parse_excludes_file2() {
         let data = bytes("[core]\nexcludesFile = ~/foo/bar");
         let got = super::parse_excludes_file(&data).unwrap();
-        assert_eq!(path_string(got), super::expand_tilde("~/foo/bar"));
+        assert_eq!(path_string(got), format!("{}/foo/bar", home_string()));
     }
 
     #[test]
@@ -848,11 +852,8 @@ mod tests {
     #[test]
     fn parse_excludes_file4() {
         let data = bytes("[core]\nexcludesFile = \"~/foo/bar\"");
-        let got = super::parse_excludes_file(&data);
-        assert_eq!(
-            path_string(got.unwrap()),
-            super::expand_tilde("~/foo/bar")
-        );
+        let got = super::parse_excludes_file(&data).unwrap();
+        assert_eq!(path_string(got), format!("{}/foo/bar", home_string()));
     }
 
     #[test]
