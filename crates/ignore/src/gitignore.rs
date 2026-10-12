@@ -862,6 +862,32 @@ mod tests {
         assert!(super::parse_excludes_file(&data).is_none());
     }
 
+    const HOME: &str = "/home/foobar";
+
+    fn expand(path: &str) -> String {
+        super::expand_tilde_with_home(path, Some(Path::new(HOME)))
+    }
+
+    #[test]
+    fn expand_tilde_leading_slash() {
+        assert_eq!(expand("~/foo/bar"), "/home/foobar/foo/bar");
+    }
+
+    #[test]
+    fn expand_tilde_alone() {
+        assert_eq!(expand("~"), "/home/foobar");
+    }
+
+    #[test]
+    fn expand_tilde_absent() {
+        assert_eq!(expand("/foo/bar"), "/foo/bar");
+    }
+
+    #[test]
+    fn expand_tilde_without_home() {
+        assert_eq!(super::expand_tilde_with_home("~/foo", None), "~/foo");
+    }
+
     // See: https://github.com/BurntSushi/ripgrep/issues/106
     #[test]
     fn regression_106() {
